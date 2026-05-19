@@ -1,0 +1,6 @@
+{
+  "name": "Laporan BK SMPN 7",
+  "description": "Dashboard laporan kegiatan layanan BK SMPN 7 dengan antarmuka 3D yang modern.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
