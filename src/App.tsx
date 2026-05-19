@@ -38,6 +38,8 @@ interface Siswa {
   nama: string;
   kelas: string;
   gender: "L" | "P";
+  tahunMasuk: string;
+  noUrut: string;
   noUnikBK: string;
 }
 
@@ -66,6 +68,8 @@ export default function App() {
     nama: "",
     kelas: "",
     gender: "L",
+    tahunMasuk: new Date().getFullYear().toString(),
+    noUrut: "",
     noUnikBK: ""
   });
 
@@ -155,14 +159,25 @@ export default function App() {
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws) as any[];
 
-      const importedSiswa: Siswa[] = data.map((item, index) => ({
-        id: (Date.now() + index).toString(),
-        nis: item.NIS || item.nis || "",
-        nama: item.Nama || item.nama || item["Nama Siswa"] || "",
-        kelas: item.Kelas || item.kelas || "",
-        gender: (item.Gender || item.gender || "L").toString().toUpperCase().startsWith("P") ? "P" : "L",
-        noUnikBK: item["No Unik BK"] || item.noUnikBK || ""
-      }));
+      const importedSiswa: Siswa[] = data.map((item, index) => {
+        const nis = (item.NIS || item.nis || "").toString();
+        const nama = (item.Nama || item.nama || item["Nama Siswa"] || "").toString();
+        const kelas = (item.Kelas || item.kelas || "").toString();
+        const gender = (item.Gender || item.gender || "L").toString().toUpperCase().startsWith("P") ? "P" : "L";
+        const thn = (item["Tahun Masuk"] || item.tahunMasuk || new Date().getFullYear()).toString();
+        const urut = (item["No Urut"] || item.noUrut || (index + 1)).toString().padStart(2, '0');
+        
+        return {
+          id: (Date.now() + index).toString(),
+          nis,
+          nama,
+          kelas,
+          gender,
+          tahunMasuk: thn,
+          noUrut: urut,
+          noUnikBK: item["No Unik BK"] || item.noUnikBK || `${kelas}-${urut}-${thn}`
+        };
+      });
 
       setSiswaList([...siswaList, ...importedSiswa]);
     };
@@ -172,8 +187,17 @@ export default function App() {
   const handleAddSiswa = () => {
     if (newSiswa.nis && newSiswa.nama) {
       const id = Date.now().toString();
-      setSiswaList([...siswaList, { ...newSiswa, id } as Siswa]);
-      setNewSiswa({ nis: "", nama: "", kelas: "", gender: "L", noUnikBK: "" });
+      const calculatedNoUnik = newSiswa.noUnikBK || `${newSiswa.kelas}-${newSiswa.noUrut}-${newSiswa.tahunMasuk}`;
+      setSiswaList([...siswaList, { ...newSiswa, id, noUnikBK: calculatedNoUnik } as Siswa]);
+      setNewSiswa({ 
+        nis: "", 
+        nama: "", 
+        kelas: "", 
+        gender: "L", 
+        tahunMasuk: new Date().getFullYear().toString(),
+        noUrut: "",
+        noUnikBK: "" 
+      });
       setIsSiswaModalOpen(false);
     }
   };
@@ -378,6 +402,7 @@ export default function App() {
                   <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 bg-[#16161a] z-10 border-b border-white/5">
                       <tr>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Thn Masuk</th>
                         <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">No NIS</th>
                         <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Nama Siswa</th>
                         <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Kelas</th>
@@ -389,6 +414,7 @@ export default function App() {
                     <tbody className="divide-y divide-white/5">
                       {siswaList.length > 0 ? siswaList.map((siswa) => (
                         <tr key={siswa.id} className="hover:bg-white/5 transition-colors group">
+                          <td className="px-4 py-4 text-sm text-slate-400">{siswa.tahunMasuk}</td>
                           <td className="px-4 py-4 text-sm font-mono text-blue-400">{siswa.nis}</td>
                           <td className="px-4 py-4 text-sm font-medium text-white">{siswa.nama}</td>
                           <td className="px-4 py-4 text-sm text-slate-400">{siswa.kelas}</td>
@@ -468,7 +494,11 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSiswaModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8">
               <h3 className="text-xl font-bold mb-8">Tambah Siswa Asuh</h3>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Tahun Masuk</label>
+                  <input type="text" value={newSiswa.tahunMasuk} onChange={(e) => setNewSiswa({ ...newSiswa, tahunMasuk: e.target.value })} placeholder="e.g. 2024" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No NIS</label>
                   <input type="text" value={newSiswa.nis} onChange={(e) => setNewSiswa({ ...newSiswa, nis: e.target.value })} placeholder="NIS" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
@@ -489,8 +519,12 @@ export default function App() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Unik BK</label>
-                  <input type="text" value={newSiswa.noUnikBK} onChange={(e) => setNewSiswa({ ...newSiswa, noUnikBK: e.target.value })} placeholder="No Unik" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Urut (untuk ID BK)</label>
+                  <input type="text" value={newSiswa.noUrut} onChange={(e) => setNewSiswa({ ...newSiswa, noUrut: e.target.value })} placeholder="01" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Unik BK (Preview: {newSiswa.kelas && newSiswa.noUrut && newSiswa.tahunMasuk ? `${newSiswa.kelas}-${newSiswa.noUrut}-${newSiswa.tahunMasuk}` : 'Otomatis'})</label>
+                  <input type="text" value={newSiswa.noUnikBK} onChange={(e) => setNewSiswa({ ...newSiswa, noUnikBK: e.target.value })} placeholder="Biarkan kosong untuk otomatis" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
                 </div>
               </div>
               <div className="mt-10 flex gap-3">
