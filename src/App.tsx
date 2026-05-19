@@ -43,7 +43,15 @@ interface Siswa {
   noUnikBK: string;
 }
 
+interface MasterSiswa {
+  id: string;
+  nis: string;
+  nama: string;
+  kelas: string;
+}
+
 const DEFAULT_LINKS: LinkItem[] = [
+  { id: "master-siswa", title: "Master Siswa", type: "internal" },
   { id: "siswa-asuh", title: "Siswa Asuh BK", type: "internal" }
 ];
 
@@ -56,11 +64,16 @@ export default function App() {
     const saved = localStorage.getItem("siswa_asuh_data");
     return saved ? JSON.parse(saved) : [];
   });
+  const [masterSiswaList, setMasterSiswaList] = useState<MasterSiswa[]>(() => {
+    const saved = localStorage.getItem("master_siswa_data");
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [activeLinkId, setActiveLinkId] = useState<string | null>(links[0]?.id || null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSiswaModalOpen, setIsSiswaModalOpen] = useState(false);
+  const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
   
   const [newLink, setNewLink] = useState({ title: "", url: "" });
   const [newSiswa, setNewSiswa] = useState<Partial<Siswa>>({
@@ -72,9 +85,14 @@ export default function App() {
     noUrut: "",
     noUnikBK: ""
   });
+  const [newMasterSiswa, setNewMasterSiswa] = useState<Partial<MasterSiswa>>({
+    nis: "",
+    nama: "",
+    kelas: ""
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const excelInputRef = useRef<HTMLInputElement>(null);
+  const masterExcelInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     localStorage.setItem("dashboard_links", JSON.stringify(links));
@@ -83,6 +101,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("siswa_asuh_data", JSON.stringify(siswaList));
   }, [siswaList]);
+
+  useEffect(() => {
+    localStorage.setItem("master_siswa_data", JSON.stringify(masterSiswaList));
+  }, [masterSiswaList]);
 
   const activeLink = links.find(l => l.id === activeLinkId);
 
@@ -113,7 +135,8 @@ export default function App() {
   const handleBackup = () => {
     const data = {
       links,
-      siswa: siswaList
+      siswa: siswaList,
+      masterSiswa: masterSiswaList
     };
     const dataStr = JSON.stringify(data, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
@@ -139,6 +162,7 @@ export default function App() {
         const json = JSON.parse(event.target?.result as string);
         if (json.links) setLinks(json.links);
         if (json.siswa) setSiswaList(json.siswa);
+        if (json.masterSiswa) setMasterSiswaList(json.masterSiswa);
         if (json.links && json.links.length > 0) setActiveLinkId(json.links[0].id);
       } catch (err) {
         alert("Invalid backup file");
@@ -147,7 +171,7 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMasterExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -159,29 +183,29 @@ export default function App() {
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws) as any[];
 
-      const importedSiswa: Siswa[] = data.map((item, index) => {
-        const nis = (item.NIS || item.nis || "").toString();
-        const nama = (item.Nama || item.nama || item["Nama Siswa"] || "").toString();
-        const kelas = (item.Kelas || item.kelas || "").toString();
-        const gender = (item.Gender || item.gender || "L").toString().toUpperCase().startsWith("P") ? "P" : "L";
-        const thn = (item["Tahun Masuk"] || item.tahunMasuk || new Date().getFullYear()).toString();
-        const urut = (item["No Urut"] || item.noUrut || (index + 1)).toString().padStart(2, '0');
-        
-        return {
-          id: (Date.now() + index).toString(),
-          nis,
-          nama,
-          kelas,
-          gender,
-          tahunMasuk: thn,
-          noUrut: urut,
-          noUnikBK: item["No Unik BK"] || item.noUnikBK || `${kelas}-${urut}-${thn}`
-        };
-      });
+      const importedMaster: MasterSiswa[] = data.map((item, index) => ({
+        id: (Date.now() + index).toString(),
+        nis: (item.NIS || item.nis || "").toString(),
+        nama: (item.Nama || item.nama || item["Nama Siswa"] || "").toString(),
+        kelas: (item.Kelas || item.kelas || "").toString()
+      }));
 
-      setSiswaList([...siswaList, ...importedSiswa]);
+      setMasterSiswaList([...masterSiswaList, ...importedMaster]);
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleAddMasterSiswa = () => {
+    if (newMasterSiswa.nis && newMasterSiswa.nama) {
+      const id = Date.now().toString();
+      setMasterSiswaList([...masterSiswaList, { ...newMasterSiswa, id } as MasterSiswa]);
+      setNewMasterSiswa({ nis: "", nama: "", kelas: "" });
+      setIsMasterModalOpen(false);
+    }
+  };
+
+  const handleDeleteMasterSiswa = (id: string) => {
+    setMasterSiswaList(masterSiswaList.filter(s => s.id !== id));
   };
 
   const handleAddSiswa = () => {
@@ -267,11 +291,11 @@ export default function App() {
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-1 shadow transition-all duration-300 rounded-full h-4 ${activeLinkId === link.id ? "bg-blue-500" : "bg-transparent"}`} />
-                  {link.id === "siswa-asuh" ? <Users size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} /> : <Globe size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} />}
+                  {link.id === "siswa-asuh" || link.id === "master-siswa" ? <Users size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} /> : <Globe size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} />}
                   <span className={`text-sm font-medium truncate flex-1 transition-colors ${activeLinkId === link.id ? "text-white" : "text-slate-400 group-hover:text-slate-200"}`}>
                     {link.title}
                   </span>
-                  {link.id !== "siswa-asuh" && (
+                  {link.id !== "siswa-asuh" && link.id !== "master-siswa" && (
                     <button 
                       onClick={(e) => handleDeleteLink(link.id, e)}
                       className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-all text-slate-500"
@@ -381,14 +405,6 @@ export default function App() {
                   </div>
                   <div className="flex gap-3">
                     <button 
-                      onClick={() => excelInputRef.current?.click()}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all text-xs font-bold"
-                    >
-                      <FileSpreadsheet size={16} />
-                      <span>Import Excel</span>
-                    </button>
-                    <input type="file" ref={excelInputRef} onChange={handleExcelImport} accept=".xls,.xlsx" className="hidden" />
-                    <button 
                       onClick={() => setIsSiswaModalOpen(true)}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-all text-xs font-bold shadow-lg shadow-blue-500/20"
                     >
@@ -437,6 +453,68 @@ export default function App() {
                         <tr>
                           <td colSpan={6} className="px-4 py-12 text-center text-slate-600 italic">
                             Belum ada data siswa asuh. Klik tambah atau import Excel.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : activeLink?.id === "master-siswa" ? (
+              <div className="w-full h-full flex flex-col p-6 overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Master Siswa</h2>
+                    <p className="text-sm text-slate-500">Database lengkap siswa SMPN 7</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => masterExcelInputRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all text-xs font-bold"
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span>Import Excel</span>
+                    </button>
+                    <input type="file" ref={masterExcelInputRef} onChange={handleMasterExcelImport} accept=".xls,.xlsx" className="hidden" />
+                    <button 
+                      onClick={() => setIsMasterModalOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-all text-xs font-bold shadow-lg shadow-blue-500/20"
+                    >
+                      <Plus size={16} />
+                      <span>Tambah Master</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-auto custom-scrollbar border border-white/5 rounded-xl bg-black/20">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-[#16161a] z-10 border-b border-white/5">
+                      <tr>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">No NIS</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Nama Siswa</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Kelas</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {masterSiswaList.length > 0 ? masterSiswaList.map((siswa) => (
+                        <tr key={siswa.id} className="hover:bg-white/5 transition-colors group">
+                          <td className="px-4 py-4 text-sm font-mono text-blue-400">{siswa.nis}</td>
+                          <td className="px-4 py-4 text-sm font-medium text-white">{siswa.nama}</td>
+                          <td className="px-4 py-4 text-sm text-slate-400">{siswa.kelas}</td>
+                          <td className="px-4 py-4 text-sm text-right">
+                            <button 
+                              onClick={() => handleDeleteMasterSiswa(siswa.id)}
+                              className="p-2 rounded-lg hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-12 text-center text-slate-600 italic">
+                            Belum ada data master siswa. Klik tambah atau import Excel.
                           </td>
                         </tr>
                       )}
@@ -495,6 +573,26 @@ export default function App() {
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8">
               <h3 className="text-xl font-bold mb-8">Tambah Siswa Asuh</h3>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Cari dari Master Siswa (Optional)</label>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Ketik NIS atau Nama..." 
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 focus:outline-none focus:border-blue-500/50 transition-colors text-white"
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase();
+                        if (val.length > 1) {
+                          const found = masterSiswaList.find(s => s.nis.toLowerCase().includes(val) || s.nama.toLowerCase().includes(val));
+                          if (found) {
+                            setNewSiswa(prev => ({ ...prev, nis: found.nis, nama: found.nama, kelas: found.kelas }));
+                          }
+                        }
+                      }}
+                    />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                  </div>
+                </div>
                 <div className="space-y-2 col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Tahun Masuk</label>
                   <input type="text" value={newSiswa.tahunMasuk} onChange={(e) => setNewSiswa({ ...newSiswa, tahunMasuk: e.target.value })} placeholder="e.g. 2024" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
@@ -530,6 +628,36 @@ export default function App() {
               <div className="mt-10 flex gap-3">
                 <button onClick={() => setIsSiswaModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300">Batal</button>
                 <button onClick={handleAddSiswa} disabled={!newSiswa.nis || !newSiswa.nama} className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all font-bold text-white shadow-lg shadow-blue-500/20">Simpan Data</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Master Siswa Modal */}
+      <AnimatePresence>
+        {isMasterModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsMasterModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-md bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8">
+              <h3 className="text-xl font-bold mb-8">Tambah Master Siswa</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No NIS</label>
+                  <input type="text" value={newMasterSiswa.nis} onChange={(e) => setNewMasterSiswa({ ...newMasterSiswa, nis: e.target.value })} placeholder="NIS" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Nama Lengkap</label>
+                  <input type="text" value={newMasterSiswa.nama} onChange={(e) => setNewMasterSiswa({ ...newMasterSiswa, nama: e.target.value })} placeholder="Nama Lengkap" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Kelas</label>
+                  <input type="text" value={newMasterSiswa.kelas} onChange={(e) => setNewMasterSiswa({ ...newMasterSiswa, kelas: e.target.value })} placeholder="e.g. 7A" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+              </div>
+              <div className="mt-10 flex gap-3">
+                <button onClick={() => setIsMasterModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300">Batal</button>
+                <button onClick={handleAddMasterSiswa} disabled={!newMasterSiswa.nis || !newMasterSiswa.nama} className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all font-bold text-white">Simpan Master</button>
               </div>
             </motion.div>
           </div>
