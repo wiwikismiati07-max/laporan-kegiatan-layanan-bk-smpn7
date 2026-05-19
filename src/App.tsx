@@ -15,21 +15,34 @@ import {
   Menu, 
   X,
   ChevronRight,
-  Monitor
+  Monitor,
+  Users,
+  Search,
+  FileSpreadsheet,
+  Save
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import * as XLSX from "xlsx";
 
 interface LinkItem {
   id: string;
   title: string;
-  url: string;
+  url?: string;
+  type: "external" | "internal";
   icon?: string;
 }
 
+interface Siswa {
+  id: string;
+  nis: string;
+  nama: string;
+  kelas: string;
+  gender: "L" | "P";
+  noUnikBK: string;
+}
+
 const DEFAULT_LINKS: LinkItem[] = [
-  { id: "1", title: "Gemini", url: "https://gemini.google.com" },
-  { id: "2", title: "Google Search", url: "https://www.google.com" },
-  { id: "3", title: "GitHub", url: "https://github.com" }
+  { id: "siswa-asuh", title: "Siswa Asuh BK", type: "internal" }
 ];
 
 export default function App() {
@@ -37,15 +50,35 @@ export default function App() {
     const saved = localStorage.getItem("dashboard_links");
     return saved ? JSON.parse(saved) : DEFAULT_LINKS;
   });
+  const [siswaList, setSiswaList] = useState<Siswa[]>(() => {
+    const saved = localStorage.getItem("siswa_asuh_data");
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [activeLinkId, setActiveLinkId] = useState<string | null>(links[0]?.id || null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSiswaModalOpen, setIsSiswaModalOpen] = useState(false);
+  
   const [newLink, setNewLink] = useState({ title: "", url: "" });
+  const [newSiswa, setNewSiswa] = useState<Partial<Siswa>>({
+    nis: "",
+    nama: "",
+    kelas: "",
+    gender: "L",
+    noUnikBK: ""
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     localStorage.setItem("dashboard_links", JSON.stringify(links));
   }, [links]);
+
+  useEffect(() => {
+    localStorage.setItem("siswa_asuh_data", JSON.stringify(siswaList));
+  }, [siswaList]);
 
   const activeLink = links.find(l => l.id === activeLinkId);
 
@@ -56,7 +89,7 @@ export default function App() {
         url = 'https://' + url;
       }
       const id = Date.now().toString();
-      setLinks([...links, { ...newLink, url, id }]);
+      setLinks([...links, { title: newLink.title, url, id, type: "external" }]);
       setNewLink({ title: "", url: "" });
       setIsModalOpen(false);
       if (!activeLinkId) setActiveLinkId(id);
@@ -65,6 +98,7 @@ export default function App() {
 
   const handleDeleteLink = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (id === "siswa-asuh") return; // Prevent deleting core module
     const filtered = links.filter(l => l.id !== id);
     setLinks(filtered);
     if (activeLinkId === id) {
@@ -73,9 +107,13 @@ export default function App() {
   };
 
   const handleBackup = () => {
-    const dataStr = JSON.stringify(links, null, 2);
+    const data = {
+      links,
+      siswa: siswaList
+    };
+    const dataStr = JSON.stringify(data, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    const exportFileDefaultName = 'dashboard-backup.json';
+    const exportFileDefaultName = 'bk-dashboard-backup.json';
 
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -95,10 +133,9 @@ export default function App() {
     reader.onload = (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
-        if (Array.isArray(json)) {
-          setLinks(json);
-          if (json.length > 0) setActiveLinkId(json[0].id);
-        }
+        if (json.links) setLinks(json.links);
+        if (json.siswa) setSiswaList(json.siswa);
+        if (json.links && json.links.length > 0) setActiveLinkId(json.links[0].id);
       } catch (err) {
         alert("Invalid backup file");
       }
@@ -106,10 +143,49 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+      const importedSiswa: Siswa[] = data.map((item, index) => ({
+        id: (Date.now() + index).toString(),
+        nis: item.NIS || item.nis || "",
+        nama: item.Nama || item.nama || item["Nama Siswa"] || "",
+        kelas: item.Kelas || item.kelas || "",
+        gender: (item.Gender || item.gender || "L").toString().toUpperCase().startsWith("P") ? "P" : "L",
+        noUnikBK: item["No Unik BK"] || item.noUnikBK || ""
+      }));
+
+      setSiswaList([...siswaList, ...importedSiswa]);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleAddSiswa = () => {
+    if (newSiswa.nis && newSiswa.nama) {
+      const id = Date.now().toString();
+      setSiswaList([...siswaList, { ...newSiswa, id } as Siswa]);
+      setNewSiswa({ nis: "", nama: "", kelas: "", gender: "L", noUnikBK: "" });
+      setIsSiswaModalOpen(false);
+    }
+  };
+
+  const handleDeleteSiswa = (id: string) => {
+    setSiswaList(siswaList.filter(s => s.id !== id));
+  };
+
   return (
     <div className="flex h-screen w-full bg-[#0a0a0c] text-slate-200 overflow-hidden font-sans">
       {/* 3D Background Decorative Elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden overflow-x-hidden overflow-y-hidden">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px]" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/10 blur-[120px]" />
       </div>
@@ -167,16 +243,18 @@ export default function App() {
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-1 shadow transition-all duration-300 rounded-full h-4 ${activeLinkId === link.id ? "bg-blue-500" : "bg-transparent"}`} />
-                  <Globe size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} />
+                  {link.id === "siswa-asuh" ? <Users size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} /> : <Globe size={16} className={activeLinkId === link.id ? "text-blue-400" : "text-slate-500"} />}
                   <span className={`text-sm font-medium truncate flex-1 transition-colors ${activeLinkId === link.id ? "text-white" : "text-slate-400 group-hover:text-slate-200"}`}>
                     {link.title}
                   </span>
-                  <button 
-                    onClick={(e) => handleDeleteLink(link.id, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-all text-slate-500"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {link.id !== "siswa-asuh" && (
+                    <button 
+                      onClick={(e) => handleDeleteLink(link.id, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-all text-slate-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
 
                 {/* 3D Shine Effect */}
@@ -202,7 +280,7 @@ export default function App() {
             <button 
               onClick={handleBackup}
               className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-slate-300"
-              title="Backup Links"
+              title="Backup Full Data"
             >
               <Download size={16} />
               <span className="text-xs font-semibold">Backup</span>
@@ -210,19 +288,13 @@ export default function App() {
             <button 
               onClick={handleUploadClick}
               className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-slate-300"
-              title="Upload Backup"
+              title="Restore Full Data"
             >
               <Upload size={16} />
-              <span className="text-xs font-semibold">Upload</span>
+              <span className="text-xs font-semibold">Restore</span>
             </button>
           </div>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept=".json" 
-            className="hidden" 
-          />
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
         </div>
       </motion.aside>
 
@@ -247,7 +319,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {activeLink && (
+            {activeLink?.type === "external" && activeLink.url && (
               <a 
                 href={activeLink.url} 
                 target="_blank" 
@@ -267,7 +339,7 @@ export default function App() {
         {/* Content Area */}
         <div className="flex-1 p-6 relative">
           <div className="w-full h-full rounded-2xl overflow-hidden border border-white/10 bg-black/60 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] transition-all duration-700">
-            {activeLink ? (
+            {activeLink?.type === "external" ? (
               <iframe
                 id="portal-iframe"
                 src={activeLink.url}
@@ -276,26 +348,89 @@ export default function App() {
                 sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
                 referrerPolicy="no-referrer"
               />
+            ) : activeLink?.id === "siswa-asuh" ? (
+              <div className="w-full h-full flex flex-col p-6 overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Siswa Asuh BK</h2>
+                    <p className="text-sm text-slate-500">Manajemen data siswa asuh bimbingan konseling</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => excelInputRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all text-xs font-bold"
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span>Import Excel</span>
+                    </button>
+                    <input type="file" ref={excelInputRef} onChange={handleExcelImport} accept=".xls,.xlsx" className="hidden" />
+                    <button 
+                      onClick={() => setIsSiswaModalOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-all text-xs font-bold shadow-lg shadow-blue-500/20"
+                    >
+                      <Plus size={16} />
+                      <span>Tambah Siswa</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-auto custom-scrollbar border border-white/5 rounded-xl bg-black/20">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-[#16161a] z-10 border-b border-white/5">
+                      <tr>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">No NIS</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Nama Siswa</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Kelas</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Gender</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">No Unik BK</th>
+                        <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {siswaList.length > 0 ? siswaList.map((siswa) => (
+                        <tr key={siswa.id} className="hover:bg-white/5 transition-colors group">
+                          <td className="px-4 py-4 text-sm font-mono text-blue-400">{siswa.nis}</td>
+                          <td className="px-4 py-4 text-sm font-medium text-white">{siswa.nama}</td>
+                          <td className="px-4 py-4 text-sm text-slate-400">{siswa.kelas}</td>
+                          <td className="px-4 py-4 text-sm">
+                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${siswa.gender === 'L' ? 'bg-blue-500/10 text-blue-400' : 'bg-pink-500/10 text-pink-400'}`}>
+                              {siswa.gender === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-slate-500">{siswa.noUnikBK}</td>
+                          <td className="px-4 py-4 text-sm">
+                            <button 
+                              onClick={() => handleDeleteSiswa(siswa.id)}
+                              className="p-2 rounded-lg hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-12 text-center text-slate-600 italic">
+                            Belum ada data siswa asuh. Klik tambah atau import Excel.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-center p-12">
                 <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                  <Plus size={32} className="text-slate-600" />
+                  <Monitor size={32} className="text-slate-600" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">No Links Found</h2>
+                <h2 className="text-2xl font-bold mb-2">Welcome to BK Dashboard</h2>
                 <p className="text-slate-500 max-w-sm">
-                  Add some items to your sidebar to start using your immersive 3D dashboard.
+                  Select a module from the sidebar to manage bimbingan konseling reports.
                 </p>
-                <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="mt-8 px-8 py-3 rounded-xl bg-white text-black font-bold hover:bg-slate-200 transition-all"
-                >
-                  Create Your First Link
-                </button>
               </div>
             )}
           </div>
           
-          {/* Subtle Ambient Glow below the iframe area */}
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent blur-sm" />
         </div>
       </main>
@@ -304,66 +439,63 @@ export default function App() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20, rotateX: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20, rotateX: 10 }}
-              className="relative w-full max-w-md bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8 perspective-1000"
-            >
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold">Add New Portal</h3>
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-full hover:bg-white/5 transition-colors text-slate-500"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-md bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8">
+              <h3 className="text-xl font-bold mb-8">Add New Portal</h3>
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">App Title</label>
-                  <input 
-                    type="text"
-                    value={newLink.title}
-                    onChange={(e) => setNewLink({ ...newLink, title: e.target.value })}
-                    placeholder="e.g. My Workspace"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white placeholder:text-slate-600"
-                  />
+                  <input type="text" value={newLink.title} onChange={(e) => setNewLink({ ...newLink, title: e.target.value })} placeholder="e.g. My Workspace" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Application URL</label>
-                  <input 
-                    type="text"
-                    value={newLink.url}
-                    onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
-                    placeholder="e.g. workspace.google.com"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white placeholder:text-slate-600"
-                  />
+                  <input type="text" value={newLink.url} onChange={(e) => setNewLink({ ...newLink, url: e.target.value })} placeholder="e.g. workspace.google.com" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
                 </div>
               </div>
-
               <div className="mt-10 flex gap-3">
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleAddLink}
-                  disabled={!newLink.title || !newLink.url}
-                  className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold text-white shadow-lg shadow-blue-500/20"
-                >
-                  Confirm & Add
-                </button>
+                <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300">Cancel</button>
+                <button onClick={handleAddLink} disabled={!newLink.title || !newLink.url} className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all font-bold text-white">Confirm & Add</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Siswa Modal */}
+      <AnimatePresence>
+        {isSiswaModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSiswaModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8">
+              <h3 className="text-xl font-bold mb-8">Tambah Siswa Asuh</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No NIS</label>
+                  <input type="text" value={newSiswa.nis} onChange={(e) => setNewSiswa({ ...newSiswa, nis: e.target.value })} placeholder="NIS" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Kelas</label>
+                  <input type="text" value={newSiswa.kelas} onChange={(e) => setNewSiswa({ ...newSiswa, kelas: e.target.value })} placeholder="e.g. IX-A" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Nama Lengkap Siswa</label>
+                  <input type="text" value={newSiswa.nama} onChange={(e) => setNewSiswa({ ...newSiswa, nama: e.target.value })} placeholder="Nama Lengkap" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Gender</label>
+                  <select value={newSiswa.gender} onChange={(e) => setNewSiswa({ ...newSiswa, gender: e.target.value as "L" | "P" })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white">
+                    <option value="L">Laki-laki</option>
+                    <option value="P">Perempuan</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Unik BK</label>
+                  <input type="text" value={newSiswa.noUnikBK} onChange={(e) => setNewSiswa({ ...newSiswa, noUnikBK: e.target.value })} placeholder="No Unik" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                </div>
+              </div>
+              <div className="mt-10 flex gap-3">
+                <button onClick={() => setIsSiswaModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300">Batal</button>
+                <button onClick={handleAddSiswa} disabled={!newSiswa.nis || !newSiswa.nama} className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all font-bold text-white shadow-lg shadow-blue-500/20">Simpan Data</button>
               </div>
             </motion.div>
           </div>
@@ -371,25 +503,12 @@ export default function App() {
       </AnimatePresence>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .preserve-3d {
-          transform-style: preserve-3d;
-        }
-        .perspective-1000 {
-          perspective: 1000px;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
+        .preserve-3d { transform-style: preserve-3d; }
+        .perspective-1000 { perspective: 1000px; }
       `}</style>
     </div>
   );
