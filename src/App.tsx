@@ -570,69 +570,125 @@ export default function App() {
         {isSiswaModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSiswaModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8">
-              <h3 className="text-xl font-bold mb-8">Tambah Siswa Asuh</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Cari dari Master Siswa (Optional)</label>
-                  <div className="relative">
-                    <input 
-                      type="text" 
-                      placeholder="Ketik NIS atau Nama..." 
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 focus:outline-none focus:border-blue-500/50 transition-colors text-white"
-                      onChange={(e) => {
-                        const val = e.target.value.toLowerCase();
-                        if (val.length > 1) {
-                          const found = masterSiswaList.find(s => s.nis.toLowerCase().includes(val) || s.nama.toLowerCase().includes(val));
-                          if (found) {
-                            setNewSiswa(prev => ({ ...prev, nis: found.nis, nama: found.nama, kelas: found.kelas }));
-                          }
-                        }
-                      }}
-                    />
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                  </div>
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Tahun Masuk</label>
-                  <input type="text" value={newSiswa.tahunMasuk} onChange={(e) => setNewSiswa({ ...newSiswa, tahunMasuk: e.target.value })} placeholder="e.g. 2024" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No NIS</label>
-                  <input type="text" value={newSiswa.nis} onChange={(e) => setNewSiswa({ ...newSiswa, nis: e.target.value })} placeholder="NIS" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Kelas</label>
-                  <input type="text" value={newSiswa.kelas} onChange={(e) => setNewSiswa({ ...newSiswa, kelas: e.target.value })} placeholder="e.g. IX-A" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Nama Lengkap Siswa</label>
-                  <input type="text" value={newSiswa.nama} onChange={(e) => setNewSiswa({ ...newSiswa, nama: e.target.value })} placeholder="Nama Lengkap" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Gender</label>
-                  <select value={newSiswa.gender} onChange={(e) => setNewSiswa({ ...newSiswa, gender: e.target.value as "L" | "P" })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white">
-                    <option value="L">Laki-laki</option>
-                    <option value="P">Perempuan</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Urut (untuk ID BK)</label>
-                  <input type="text" value={newSiswa.noUrut} onChange={(e) => setNewSiswa({ ...newSiswa, noUrut: e.target.value })} placeholder="01" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Unik BK (Preview: {newSiswa.kelas && newSiswa.noUrut && newSiswa.tahunMasuk ? `${newSiswa.kelas}-${newSiswa.noUrut}-${newSiswa.tahunMasuk}` : 'Otomatis'})</label>
-                  <input type="text" value={newSiswa.noUnikBK} onChange={(e) => setNewSiswa({ ...newSiswa, noUnikBK: e.target.value })} placeholder="Biarkan kosong untuk otomatis" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
-                </div>
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-[#16161a] border border-white/10 rounded-3xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold">Tambah Anak Asuh BK</h3>
+                <button onClick={() => setIsSiswaModalOpen(false)} className="p-2 rounded-full hover:bg-white/5 text-slate-500 transition-colors"><X size={20} /></button>
               </div>
-              <div className="mt-10 flex gap-3">
-                <button onClick={() => setIsSiswaModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300">Batal</button>
-                <button onClick={handleAddSiswa} disabled={!newSiswa.nis || !newSiswa.nama} className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all font-bold text-white shadow-lg shadow-blue-500/20">Simpan Data</button>
+              
+              <div className="space-y-6">
+                {/* Step 1: Selection from Master */}
+                {!newSiswa.nis ? (
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-blue-400 px-1">Langkah 1: Pilih Siswa dari Master</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                      <input 
+                        type="text" 
+                        placeholder="Cari Nama atau NIS..." 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pl-10 focus:outline-none focus:border-blue-500/50 transition-colors text-white"
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase();
+                          const results = masterSiswaList.filter(s => s.nis.toLowerCase().includes(val) || s.nama.toLowerCase().includes(val)).slice(0, 5);
+                          // We'll show results inline
+                          (window as any)._searchResults = results;
+                          const container = document.getElementById('search-results');
+                          if (container) {
+                            container.innerHTML = results.length > 0 ? results.map(s => `
+                              <div class="p-3 hover:bg-white/10 cursor-pointer border-b border-white/5 flex justify-between items-center transition-colors" onclick="window.pickSiswa('${s.nis}', '${s.nama.replace(/'/g, "\\'")}', '${s.kelas}')">
+                                <div>
+                                  <div class="text-sm font-medium text-white">${s.nama}</div>
+                                  <div class="text-xs text-slate-500">${s.nis} • ${s.kelas}</div>
+                                </div>
+                                <div class="text-[10px] font-bold text-blue-500">PILIH</div>
+                              </div>
+                            `).join('') : '<div class="p-4 text-center text-slate-600 italic">Siswa tidak ditemukan</div>';
+                          }
+                        }}
+                      />
+                    </div>
+                    <div id="search-results" className="mt-2 border border-white/5 rounded-xl bg-black/20 overflow-hidden">
+                      <div className="p-4 text-center text-slate-600 italic">Cari siswa untuk mulai...</div>
+                    </div>
+                    {masterSiswaList.length === 0 && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs text-center">
+                        Data Master Siswa masih kosong. Silakan upload master data terlebih dahulu.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex justify-between items-center">
+                      <div>
+                        <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1">Siswa Terpilih</div>
+                        <div className="text-white font-bold">{newSiswa.nama}</div>
+                        <div className="text-xs text-blue-400 font-mono">{newSiswa.nis} • Kelas {newSiswa.kelas}</div>
+                      </div>
+                      <button onClick={() => setNewSiswa({ ...newSiswa, nis: "", nama: "", kelas: "" })} className="text-[10px] font-bold text-slate-500 hover:text-white transition-colors">GANTI</button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Tahun Masuk</label>
+                        <input type="text" value={newSiswa.tahunMasuk} onChange={(e) => setNewSiswa({ ...newSiswa, tahunMasuk: e.target.value })} placeholder="e.g. 2024" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">No Urut (Formasi BK)</label>
+                        <input type="text" value={newSiswa.noUrut} onChange={(e) => setNewSiswa({ ...newSiswa, noUrut: e.target.value })} placeholder="01" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white" />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Gender</label>
+                        <select value={newSiswa.gender} onChange={(e) => setNewSiswa({ ...newSiswa, gender: e.target.value as "L" | "P" })} className="w-full bg-[#1e1e24] border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-colors text-white appearance-none cursor-pointer">
+                          <option value="L">LAKI-LAKI</option>
+                          <option value="P">PEREMPUAN</option>
+                        </select>
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Preview No Unik BK</label>
+                        <div className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-4 font-mono text-center text-xl tracking-widest text-blue-400 shadow-inner">
+                          {newSiswa.kelas}-{newSiswa.noUrut || '00'}-{newSiswa.tahunMasuk || '0000'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8 flex gap-3">
+                      <button onClick={() => setIsSiswaModalOpen(false)} className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all font-bold text-slate-300">Batal</button>
+                      <button 
+                        onClick={handleAddSiswa} 
+                        disabled={!newSiswa.noUrut || !newSiswa.tahunMasuk} 
+                        className="flex-[2] py-3 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all font-bold text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
+                      >
+                        Simpan Data BK
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      <script dangerouslySetInnerHTML={{ __html: `
+        window.pickSiswa = (nis, nama, kelas) => {
+          // This is a bridge between the injected HTML and React
+          const event = new CustomEvent('pick-siswa', { detail: { nis, nama, kelas } });
+          window.dispatchEvent(event);
+        };
+      `}} />
+
+      {React.useEffect(() => {
+        const handler = (e: any) => {
+          setNewSiswa(prev => ({ 
+            ...prev, 
+            nis: e.detail.nis, 
+            nama: e.detail.nama, 
+            kelas: e.detail.kelas 
+          }));
+        };
+        window.addEventListener('pick-siswa', handler);
+        return () => window.removeEventListener('pick-siswa', handler);
+      }, [])}
 
       {/* Add Master Siswa Modal */}
       <AnimatePresence>
